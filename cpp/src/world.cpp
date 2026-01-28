@@ -326,7 +326,7 @@ void World::placeStructures() {
     // POOL - between open green and house
     // X: -15 to 0, Z: -10 to 10
     // ============================================================
-    int poolX1 = -15, poolX2 = 0, poolZ1 = -10, poolZ2 = 10;
+    int poolX1 = -8, poolX2 = 0, poolZ1 = -10, poolZ2 = 10;
     fillBox(poolX1, G - 3, poolZ1, poolX2, G, poolZ2, BlockType::STONE);
     fillBox(poolX1 + 1, G - 2, poolZ1 + 1, poolX2 - 1, G, poolZ2 - 1, BlockType::WATER);
     for (int x = poolX1 - 1; x <= poolX2 + 1; x++) {
@@ -592,25 +592,19 @@ void World::placeStructures() {
     // Goes northeast from cement apron, then turns due east
     // ============================================================
     int driveW = 7;
-    int driveStartX = (gx1 + gx2) / 2 - driveW / 2;
-    int driveStartZ = apronZ2;
-    int diagLen = 15;
 
-    // Diagonal section: goes northeast (+X, -Z) like a forward slash /
-    for (int i = 0; i < diagLen; i++) {
-        int cx = driveStartX + i;
-        int cz = driveStartZ - i;
-        for (int w = 0; w < driveW; w++) {
-            setBlock(cx + w, G, cz, BlockType::BEDROCK);
-            setBlock(cx + w, G, cz - 1, BlockType::BEDROCK);
-        }
-    }
+    // Driveway starts east of the apron, goes straight east
+    int driveStartX = gx2 + 2;
+    int driveZ = (apronZ1 + apronZ2) / 2; // center of apron
 
-    // Straight east section from top of the forward slash
-    int straightStartX = driveStartX + diagLen;
-    int straightZ = driveStartZ - diagLen;
-    for (int x = straightStartX; x <= propX2; x++)
-        for (int z = straightZ - driveW / 2; z <= straightZ + driveW / 2; z++)
+    // Connect apron to driveway start
+    for (int x = gx2 + 1; x <= driveStartX; x++)
+        for (int z = driveZ - driveW / 2; z <= driveZ + driveW / 2; z++)
+            setBlock(x, G, z, BlockType::BEDROCK);
+
+    // Straight east section
+    for (int x = driveStartX; x <= propX2; x++)
+        for (int z = driveZ - driveW / 2; z <= driveZ + driveW / 2; z++)
             setBlock(x, G, z, BlockType::BEDROCK);
 
     // ============================================================
