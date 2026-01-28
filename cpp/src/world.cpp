@@ -593,20 +593,22 @@ void World::placeStructures() {
     // ============================================================
     int driveW = 7;
     int driveStartX = (gx1 + gx2) / 2 - driveW / 2;
-    int driveStartZ = apronZ2 + 1;
+    int driveStartZ = apronZ2;
     int diagLen = 15;
 
+    // Diagonal section: goes northeast (+X, -Z) like a forward slash /
     for (int i = 0; i < diagLen; i++) {
         int cx = driveStartX + i;
-        int cz = driveStartZ + i;
+        int cz = driveStartZ - i;
         for (int w = 0; w < driveW; w++) {
             setBlock(cx + w, G, cz, BlockType::BEDROCK);
-            setBlock(cx + w, G, cz + 1, BlockType::BEDROCK);
+            setBlock(cx + w, G, cz - 1, BlockType::BEDROCK);
         }
     }
 
+    // Straight east section from top of the forward slash
     int straightStartX = driveStartX + diagLen;
-    int straightZ = driveStartZ + diagLen;
+    int straightZ = driveStartZ - diagLen;
     for (int x = straightStartX; x <= propX2; x++)
         for (int z = straightZ - driveW / 2; z <= straightZ + driveW / 2; z++)
             setBlock(x, G, z, BlockType::BEDROCK);
