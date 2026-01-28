@@ -287,13 +287,16 @@ void World::placeStructures() {
     // Ground level
     const int G = 64;
 
-    // === Flatten the property area: roughly -50..50 x -50..50 ===
-    for (int x = -55; x <= 55; x++) {
-        for (int z = -55; z <= 55; z++) {
-            // Clear everything above ground
+    // Property is a long rectangle running west(-X) to east(+X)
+    // Layout west to east: POND | open green | POOL | HOUSE | DRIVEWAY -->
+    // Property bounds: X: -80 to 80, Z: -25 to 25
+    int propX1 = -80, propX2 = 80, propZ1 = -25, propZ2 = 25;
+
+    // === Flatten the property ===
+    for (int x = propX1 - 5; x <= propX2 + 5; x++) {
+        for (int z = propZ1 - 5; z <= propZ2 + 5; z++) {
             for (int y = G + 1; y < G + 40; y++)
                 setBlock(x, y, z, BlockType::AIR);
-            // Set ground
             setBlock(x, G, z, BlockType::GRASS);
             for (int y = G - 1; y >= G - 4; y--)
                 setBlock(x, y, z, BlockType::DIRT);
@@ -301,28 +304,68 @@ void World::placeStructures() {
     }
 
     // ============================================================
-    // HOUSE - L-shaped, based on aerial view
-    // Main wing runs east-west (X axis), narrower wing extends south (+Z)
-    // House center roughly at (5, G+1, -5)
+    // POND - spans full width (Z) at the west end
+    // X: -75 to -55, Z: -22 to 22
     // ============================================================
+    int pondX1 = -75, pondX2 = -55, pondZ1 = -22, pondZ2 = 22;
+    // Irregular pond with organic edges
+    for (int x = pondX1 - 2; x <= pondX2 + 2; x++) {
+        for (int z = pondZ1 - 2; z <= pondZ2 + 2; z++) {
+            // Normalize to ellipse
+            float nx = (float)(x - (pondX1 + pondX2) / 2) / ((pondX2 - pondX1) / 2.0f);
+            float nz = (float)(z - (pondZ1 + pondZ2) / 2) / ((pondZ2 - pondZ1) / 2.0f);
+            float dist = sqrtf(nx * nx + nz * nz);
+            if (dist < 0.9f) {
+                setBlock(x, G, z, BlockType::WATER);
+                setBlock(x, G - 1, z, BlockType::CLAY);
+                setBlock(x, G - 2, z, BlockType::CLAY);
+                setBlock(x, G - 3, z, BlockType::CLAY);
+            } else if (dist < 1.05f) {
+                setBlock(x, G, z, BlockType::SAND);
+            }
+        }
+    }
 
-    // Main wing: 20 wide (X: -5 to 14), 12 deep (Z: -15 to -4), 6 tall
-    int hx1 = -5, hx2 = 14, hz1 = -15, hz2 = -4;
+    // ============================================================
+    // POOL - between open green and house
+    // X: -15 to 0, Z: -8 to 8
+    // ============================================================
+    int poolX1 = -15, poolX2 = 0, poolZ1 = -8, poolZ2 = 8;
+    fillBox(poolX1, G - 3, poolZ1, poolX2, G, poolZ2, BlockType::STONE);
+    fillBox(poolX1 + 1, G - 2, poolZ1 + 1, poolX2 - 1, G, poolZ2 - 1, BlockType::WATER);
+    // Sandstone border
+    for (int x = poolX1 - 1; x <= poolX2 + 1; x++) {
+        setBlock(x, G, poolZ1 - 1, BlockType::SANDSTONE);
+        setBlock(x, G, poolZ2 + 1, BlockType::SANDSTONE);
+    }
+    for (int z = poolZ1 - 1; z <= poolZ2 + 1; z++) {
+        setBlock(poolX1 - 1, G, z, BlockType::SANDSTONE);
+        setBlock(poolX2 + 1, G, z, BlockType::SANDSTONE);
+    }
+
+    // Patio/deck between pool and house
+    fillRect(1, G, -10, 8, 10, BlockType::PLANKS);
+
+    // ============================================================
+    // HOUSE - L-shaped, east of pool
+    // Main wing: X: 10 to 30, Z: -12 to -1
+    // South wing: X: 10 to 19, Z: -1 to 10
+    // ============================================================
+    int hx1 = 10, hx2 = 30, hz1 = -12, hz2 = -1;
     int hy = G + 1;
     int wallH = 5;
 
     // Foundation
     fillRect(hx1 - 1, G, hz1 - 1, hx2 + 1, hz2 + 1, BlockType::STONE);
 
-    // Walls (cobblestone) with air inside
+    // Main wing walls
     hollowBox(hx1, hy, hz1, hx2, hy + wallH - 1, hz2,
               BlockType::COBBLESTONE, BlockType::AIR);
-
-    // Floor
     fillRect(hx1 + 1, hy, hz1 + 1, hx2 - 1, hz2 - 1, BlockType::PLANKS);
 
-    // South wing (the L extension): 10 wide (X: -5 to 4), 12 deep (Z: -4 to 7)
-    int sx1 = -5, sx2 = 4, sz1 = -4, sz2 = 7;
+    // South wing
+    int sx1 = 10, sx2 = 19, sz1 = -1, sz2 = 10;
+    fillRect(sx1 - 1, G, sz1 - 1, sx2 + 1, sz2 + 1, BlockType::STONE);
     hollowBox(sx1, hy, sz1, sx2, hy + wallH - 1, sz2,
               BlockType::COBBLESTONE, BlockType::AIR);
     fillRect(sx1 + 1, hy, sz1 + 1, sx2 - 1, sz2 - 1, BlockType::PLANKS);
@@ -335,25 +378,32 @@ void World::placeStructures() {
     // Windows - main wing (north and south walls)
     for (int x = hx1 + 2; x <= hx2 - 2; x += 3) {
         for (int y = hy + 2; y <= hy + 3; y++) {
-            setBlock(x, y, hz1, BlockType::GLASS); // north
-            if (x > sx2) // south wall only where no south wing
+            setBlock(x, y, hz1, BlockType::GLASS);
+            if (x > sx2)
                 setBlock(x, y, hz2, BlockType::GLASS);
         }
     }
-    // Windows - south wing (east and west walls)
+    // Windows - main wing east/west walls
+    for (int z = hz1 + 2; z <= hz2 - 2; z += 3) {
+        for (int y = hy + 2; y <= hy + 3; y++) {
+            setBlock(hx1, y, z, BlockType::GLASS);
+            setBlock(hx2, y, z, BlockType::GLASS);
+        }
+    }
+    // Windows - south wing
     for (int z = sz1 + 2; z <= sz2 - 2; z += 3) {
         for (int y = hy + 2; y <= hy + 3; y++) {
-            setBlock(sx1, y, z, BlockType::GLASS); // west
-            setBlock(sx2, y, z, BlockType::GLASS); // east
+            setBlock(sx1, y, z, BlockType::GLASS);
+            setBlock(sx2, y, z, BlockType::GLASS);
         }
     }
 
-    // Door - south wing south wall, centered
-    int doorX = (sx1 + sx2) / 2;
-    setBlock(doorX, hy + 1, sz2, BlockType::AIR);
-    setBlock(doorX, hy + 2, sz2, BlockType::AIR);
+    // Door - east wall of main wing, centered
+    int doorZ = (hz1 + hz2) / 2;
+    setBlock(hx2, hy + 1, doorZ, BlockType::AIR);
+    setBlock(hx2, hy + 2, doorZ, BlockType::AIR);
 
-    // Roof - main wing (peaked, running east-west)
+    // Roof - main wing (peaked, ridge runs east-west)
     for (int x = hx1 - 1; x <= hx2 + 1; x++) {
         for (int layer = 0; layer <= 3; layer++) {
             int rz1 = hz1 - 1 + layer;
@@ -361,12 +411,12 @@ void World::placeStructures() {
             int ry = hy + wallH + layer;
             if (rz1 <= rz2) {
                 for (int z = rz1; z <= rz2; z++)
-                    setBlock(x, ry, z, BlockType::CLAY); // brown-ish roof
+                    setBlock(x, ry, z, BlockType::CLAY);
             }
         }
     }
 
-    // Roof - south wing (peaked, running north-south)
+    // Roof - south wing (peaked, ridge runs north-south)
     for (int z = sz1; z <= sz2 + 1; z++) {
         for (int layer = 0; layer <= 2; layer++) {
             int rx1 = sx1 - 1 + layer;
@@ -382,92 +432,41 @@ void World::placeStructures() {
     }
 
     // ============================================================
-    // PATIO / DECK - between house and pool (west side)
+    // DRIVEWAY - exits east from the house door
+    // X: 31 to 80, Z: doorZ-3 to doorZ+3
     // ============================================================
-    int px1 = -18, px2 = -6, pz1 = -10, pz2 = 4;
-    fillRect(px1, G, pz1, px2, pz2, BlockType::PLANKS);
-
-    // ============================================================
-    // POOL - rectangular, west of patio
-    // ============================================================
-    int poolX1 = -30, poolX2 = -19, poolZ1 = -8, poolZ2 = 2;
-    // Pool walls and floor (stone)
-    fillBox(poolX1, G - 3, poolZ1, poolX2, G, poolZ2, BlockType::STONE);
-    // Pool interior (water)
-    fillBox(poolX1 + 1, G - 2, poolZ1 + 1, poolX2 - 1, G, poolZ2 - 1, BlockType::WATER);
-    // Pool edge (sandstone border)
-    for (int x = poolX1 - 1; x <= poolX2 + 1; x++) {
-        setBlock(x, G, poolZ1 - 1, BlockType::SANDSTONE);
-        setBlock(x, G, poolZ2 + 1, BlockType::SANDSTONE);
-    }
-    for (int z = poolZ1 - 1; z <= poolZ2 + 1; z++) {
-        setBlock(poolX1 - 1, G, z, BlockType::SANDSTONE);
-        setBlock(poolX2 + 1, G, z, BlockType::SANDSTONE);
-    }
-
-    // ============================================================
-    // DRIVEWAY - coming from the south, gravel path
-    // ============================================================
-    for (int z = sz2 + 2; z <= 55; z++) {
-        for (int x = -2; x <= 4; x++) {
+    for (int x = hx2 + 1; x <= propX2; x++) {
+        for (int z = doorZ - 3; z <= doorZ + 3; z++) {
             setBlock(x, G, z, BlockType::GRAVEL);
         }
     }
 
     // ============================================================
-    // POND - northwest of the house
+    // TREES - border the property perimeter
     // ============================================================
-    int pondCX = -25, pondCZ = -30;
-    // Irregular pond shape
-    for (int dx = -6; dx <= 6; dx++) {
-        for (int dz = -5; dz <= 5; dz++) {
-            float dist = sqrtf((float)(dx*dx) + (float)(dz*dz) * 1.2f);
-            if (dist < 5.5f) {
-                int px = pondCX + dx, pz = pondCZ + dz;
-                setBlock(px, G, pz, BlockType::WATER);
-                setBlock(px, G - 1, pz, BlockType::CLAY);
-                setBlock(px, G - 2, pz, BlockType::CLAY);
-                // Sandy edges
-                if (dist > 4.0f)
-                    setBlock(px, G, pz, BlockType::WATER);
-            }
-            // Sand border
-            if (dist >= 5.0f && dist < 6.5f) {
-                setBlock(pondCX + dx, G, pondCZ + dz, BlockType::SAND);
-            }
-        }
-    }
-
-    // ============================================================
-    // TREES - dense around the property perimeter
-    // ============================================================
-    // Tree positions forming a border, matching the aerial view
     struct TreePos { int x, z, h; };
     TreePos trees[] = {
-        // North tree line
-        {-20, -25, 7}, {-12, -28, 8}, {-5, -26, 6}, {3, -25, 7},
-        {10, -27, 8}, {18, -24, 7}, {25, -26, 6},
-        // Northeast
-        {22, -18, 7}, {25, -12, 8}, {28, -6, 7}, {24, -2, 6},
-        // East tree line
-        {22, 3, 7}, {25, 8, 8}, {23, 14, 7}, {20, 20, 6},
-        {22, 26, 7},
-        // South tree line (along driveway edges)
-        {-10, 15, 6}, {-15, 18, 7}, {-12, 25, 8}, {-8, 30, 7},
-        {10, 15, 7}, {14, 20, 6}, {12, 28, 8},
-        // West tree line
-        {-35, -20, 7}, {-38, -12, 8}, {-36, -5, 7}, {-35, 3, 6},
-        {-38, 10, 7}, {-35, 18, 8}, {-36, 25, 7},
-        // Northwest (around pond)
-        {-35, -28, 6}, {-32, -35, 7}, {-20, -38, 8}, {-15, -35, 7},
-        // Fill more around the house
-        {-18, -20, 6}, {-20, -15, 7}, {16, -20, 8}, {18, -10, 7},
-        {-20, 8, 6}, {-22, 14, 7}, {15, 10, 6}, {18, 15, 7},
-        // Extra trees for density
-        {-28, -22, 7}, {-30, -8, 6}, {-32, 5, 7}, {-30, 15, 8},
-        {28, -20, 6}, {30, -10, 7}, {28, 5, 6}, {26, 15, 7},
-        {-8, -35, 7}, {5, -33, 8}, {15, -32, 6},
-        {-25, 20, 7}, {-20, 28, 6}, {18, 25, 7},
+        // North border
+        {-70, -24, 7}, {-60, -24, 8}, {-50, -24, 7}, {-40, -24, 6},
+        {-30, -24, 8}, {-20, -24, 7}, {-10, -24, 6}, {0, -24, 7},
+        {10, -24, 8}, {20, -24, 7}, {30, -24, 6}, {40, -24, 8},
+        {50, -24, 7}, {60, -24, 6}, {70, -24, 7},
+        // South border
+        {-70, 24, 8}, {-60, 24, 7}, {-50, 24, 6}, {-40, 24, 8},
+        {-30, 24, 7}, {-20, 24, 6}, {-10, 24, 7}, {0, 24, 8},
+        {10, 24, 7}, {20, 24, 6}, {30, 24, 8}, {40, 24, 7},
+        {50, 24, 6}, {60, 24, 8}, {70, 24, 7},
+        // West border (around pond)
+        {-78, -15, 7}, {-78, -5, 8}, {-78, 5, 7}, {-78, 15, 6},
+        // Between pond and pool (open green area with scattered trees)
+        {-45, -18, 7}, {-38, 16, 8}, {-48, 10, 6}, {-35, -10, 7},
+        {-42, 5, 8}, {-30, -16, 6}, {-25, 14, 7},
+        // Around house
+        {8, -18, 7}, {8, 16, 8}, {25, 16, 7}, {32, 16, 6},
+        {32, -18, 8},
+        // Along driveway (east)
+        {45, -15, 7}, {55, -15, 8}, {65, -15, 7},
+        {45, 15, 6}, {55, 15, 7}, {65, 15, 8},
     };
 
     for (auto& t : trees) {

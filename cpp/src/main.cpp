@@ -95,8 +95,10 @@ int main(int argc, char** argv) {
     world.placeStructures();
     std::cout << "Placed structures (house, pool, pond, trees, driveway)" << std::endl;
 
-    int spawnHeight = world.getHeight(0, 0);
-    camera.position = glm::vec3(0.5f, (float)(spawnHeight + 2), 0.5f);
+    // Spawn in the open green area, facing east toward the house
+    int spawnHeight = world.getHeight(-30, 0);
+    camera.position = glm::vec3(-30.0f, (float)(spawnHeight + 2), 0.5f);
+    camera.yaw = 0.0f; // face east (+X)
     std::cout << "Spawn at y=" << spawnHeight + 2 << std::endl;
 
     float lastTime = (float)glfwGetTime();
