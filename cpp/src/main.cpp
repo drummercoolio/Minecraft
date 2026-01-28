@@ -91,6 +91,10 @@ int main(int argc, char** argv) {
     for (int i = 0; i < 20; i++)
         world.update(camera.position);
 
+    // Place house, pool, pond, trees, driveway at spawn
+    world.placeStructures();
+    std::cout << "Placed structures (house, pool, pond, trees, driveway)" << std::endl;
+
     int spawnHeight = world.getHeight(0, 0);
     camera.position = glm::vec3(0.5f, (float)(spawnHeight + 2), 0.5f);
     std::cout << "Spawn at y=" << spawnHeight + 2 << std::endl;
