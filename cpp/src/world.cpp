@@ -287,8 +287,8 @@ void World::placeStructures() {
     // Ground level
     const int G = 64;
 
-    // Property wider N-S: X: -80 to 80, Z: -45 to 45
-    int propX1 = -80, propX2 = 80, propZ1 = -45, propZ2 = 45;
+    // Property wider N-S, longer E for driveway: X: -80 to 120, Z: -45 to 45
+    int propX1 = -80, propX2 = 120, propZ1 = -45, propZ2 = 45;
 
     // === Flatten the property ===
     for (int x = propX1 - 5; x <= propX2 + 5; x++) {
@@ -637,8 +637,8 @@ void World::placeStructures() {
         {8, -30, 7}, {8, 28, 8}, {25, 28, 7}, {32, 28, 6},
         {32, -30, 8},
         // Along driveway (east)
-        {45, -25, 7}, {55, -25, 8}, {65, -25, 7},
-        {45, 25, 6}, {55, 25, 7}, {65, 25, 8},
+        {45, -25, 7}, {55, -25, 8}, {65, -25, 7}, {80, -25, 6}, {95, -25, 8}, {110, -25, 7},
+        {45, 25, 6}, {55, 25, 7}, {65, 25, 8}, {80, 25, 7}, {95, 25, 6}, {110, 25, 8},
     };
 
     for (auto& t : trees)
