@@ -110,7 +110,7 @@ GLuint generateTextureAtlas() {
             setPixel(img, W, 0*16+dx, 1*16+dy, 240, 245, 255);
     fillTile(img, W, 1, 1, 240, 245, 255, 3);         // 1,1: snow top
     fillTile(img, W, 2, 1, 210, 200, 150, 8);         // 2,1: sandstone
-    fillTile(img, W, 3, 1, 160, 155, 145, 6);         // 3,1: clay
+    fillTile(img, W, 3, 1, 200, 120, 50, 8);           // 3,1: clay (orange roof)
     fillTile(img, W, 4, 1, 110, 110, 110, 12);        // 4,1: cobblestone
     // Cobble cracks
     for (int i = 0; i < 20; i++) {

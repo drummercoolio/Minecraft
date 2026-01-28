@@ -360,7 +360,7 @@ void World::placeStructures() {
     int hy = G + 1;
     int wallH = 6;
     int W = 10; // house width (depth)
-    BlockType roofBlock = BlockType::COAL_ORE; // dark asphalt shingles
+    BlockType roofBlock = BlockType::CLAY; // orange roof
 
     // --- Base wing (east-west) ---
     int bx1 = 10, bx2 = 35, bz1 = -5, bz2 = 5;
@@ -509,11 +509,87 @@ void World::placeStructures() {
     setBlock(lastSx1, hy + 2, backDoorZ, BlockType::AIR);
 
     // ============================================================
-    // DRIVEWAY - exits east from the house front door
+    // TWO-CAR GARAGE - attached to south side of base wing
+    // Garage: X: 22 to 35, Z: 6 to 16 (south of base wing bz2=5)
     // ============================================================
-    for (int x = bx2 + 1; x <= propX2; x++) {
-        for (int z = doorZ - 3; z <= doorZ + 3; z++) {
-            setBlock(x, G, z, BlockType::GRAVEL);
+    int gx1 = 22, gx2 = 35, gz1 = bz2 + 1, gz2 = bz2 + 11;
+    // Foundation
+    fillRect(gx1 - 1, G, gz1 - 1, gx2 + 1, gz2 + 1, BlockType::STONE);
+    // Walls
+    hollowBox(gx1, hy, gz1, gx2, hy + wallH - 1, gz2,
+              BlockType::COBBLESTONE, BlockType::AIR);
+    fillRect(gx1 + 1, hy, gz1 + 1, gx2 - 1, gz2 - 1, BlockType::PLANKS);
+
+    // Remove wall between base wing and garage (shared north wall of garage)
+    for (int x = gx1 + 1; x <= gx2 - 1; x++)
+        for (int y = hy; y < hy + wallH; y++)
+            setBlock(x, y, gz1, BlockType::AIR);
+    // Re-floor the shared wall line
+    for (int x = gx1 + 1; x <= gx2 - 1; x++)
+        setBlock(x, hy, gz1, BlockType::PLANKS);
+
+    // Two garage door openings on south wall (each 5 wide, 4 tall)
+    // Door 1: X: 23 to 27
+    for (int x = gx1 + 1; x <= gx1 + 5; x++)
+        for (int y = hy + 1; y <= hy + 4; y++)
+            setBlock(x, y, gz2, BlockType::AIR);
+    // Door 2: X: 29 to 33
+    for (int x = gx1 + 7; x <= gx1 + 11; x++)
+        for (int y = hy + 1; y <= hy + 4; y++)
+            setBlock(x, y, gz2, BlockType::AIR);
+
+    // Windows on east wall of garage
+    for (int z = gz1 + 2; z <= gz2 - 2; z += 3)
+        for (int y = hy + 2; y <= hy + 3; y++)
+            setBlock(gx2, y, z, BlockType::GLASS);
+
+    // Garage roof: ridge east-west, peaked north-south
+    for (int x = gx1 - 1; x <= gx2 + 1; x++) {
+        for (int layer = 0; layer <= 3; layer++) {
+            int rz1 = gz1 - 1 + layer;
+            int rz2 = gz2 + 1 - layer;
+            int ry = hy + wallH + layer;
+            if (rz1 <= rz2)
+                for (int z = rz1; z <= rz2; z++)
+                    setBlock(x, ry, z, roofBlock);
+        }
+    }
+
+    // ============================================================
+    // CEMENT APRON in front of garage doors
+    // Stone blocks for light cement look
+    // X: gx1-1 to gx2+1, Z: gz2+1 to gz2+6
+    // ============================================================
+    int apronZ1 = gz2 + 1, apronZ2 = gz2 + 6;
+    fillRect(gx1 - 1, G, apronZ1, gx2 + 1, apronZ2, BlockType::STONE);
+
+    // ============================================================
+    // DRIVEWAY - black asphalt (BEDROCK for dark look)
+    // Goes northeast from cement apron, then turns due east
+    // ============================================================
+    int driveW = 7; // driveway width
+
+    // Diagonal section: goes northeast (+X, +Z) from apron
+    // Start at center of apron south edge
+    int driveStartX = (gx1 + gx2) / 2 - driveW / 2;
+    int driveStartZ = apronZ2 + 1;
+    int diagLen = 15; // how far the diagonal goes
+
+    for (int i = 0; i < diagLen; i++) {
+        int cx = driveStartX + i;
+        int cz = driveStartZ + i;
+        for (int w = 0; w < driveW; w++) {
+            setBlock(cx + w, G, cz, BlockType::BEDROCK);
+            setBlock(cx + w, G, cz + 1, BlockType::BEDROCK);
+        }
+    }
+
+    // Straight east section: continues due east from end of diagonal
+    int straightStartX = driveStartX + diagLen;
+    int straightZ = driveStartZ + diagLen;
+    for (int x = straightStartX; x <= propX2; x++) {
+        for (int z = straightZ - driveW / 2; z <= straightZ + driveW / 2; z++) {
+            setBlock(x, G, z, BlockType::BEDROCK);
         }
     }
 
