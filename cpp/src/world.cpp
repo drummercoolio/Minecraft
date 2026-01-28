@@ -287,10 +287,8 @@ void World::placeStructures() {
     // Ground level
     const int G = 64;
 
-    // Property is a long rectangle running west(-X) to east(+X)
-    // Layout west to east: POND | open green | POOL | HOUSE | DRIVEWAY -->
-    // Property bounds: X: -80 to 80, Z: -25 to 25
-    int propX1 = -80, propX2 = 80, propZ1 = -25, propZ2 = 25;
+    // Property wider N-S: X: -80 to 80, Z: -45 to 45
+    int propX1 = -80, propX2 = 80, propZ1 = -45, propZ2 = 45;
 
     // === Flatten the property ===
     for (int x = propX1 - 5; x <= propX2 + 5; x++) {
@@ -305,13 +303,11 @@ void World::placeStructures() {
 
     // ============================================================
     // POND - spans full width (Z) at the west end
-    // X: -75 to -55, Z: -22 to 22
+    // X: -75 to -55, Z: -40 to 40
     // ============================================================
-    int pondX1 = -75, pondX2 = -55, pondZ1 = -22, pondZ2 = 22;
-    // Irregular pond with organic edges
+    int pondX1 = -75, pondX2 = -55, pondZ1 = -40, pondZ2 = 40;
     for (int x = pondX1 - 2; x <= pondX2 + 2; x++) {
         for (int z = pondZ1 - 2; z <= pondZ2 + 2; z++) {
-            // Normalize to ellipse
             float nx = (float)(x - (pondX1 + pondX2) / 2) / ((pondX2 - pondX1) / 2.0f);
             float nz = (float)(z - (pondZ1 + pondZ2) / 2) / ((pondZ2 - pondZ1) / 2.0f);
             float dist = sqrtf(nx * nx + nz * nz);
@@ -328,12 +324,11 @@ void World::placeStructures() {
 
     // ============================================================
     // POOL - between open green and house
-    // X: -15 to 0, Z: -8 to 8
+    // X: -15 to 0, Z: -10 to 10
     // ============================================================
-    int poolX1 = -15, poolX2 = 0, poolZ1 = -8, poolZ2 = 8;
+    int poolX1 = -15, poolX2 = 0, poolZ1 = -10, poolZ2 = 10;
     fillBox(poolX1, G - 3, poolZ1, poolX2, G, poolZ2, BlockType::STONE);
     fillBox(poolX1 + 1, G - 2, poolZ1 + 1, poolX2 - 1, G, poolZ2 - 1, BlockType::WATER);
-    // Sandstone border
     for (int x = poolX1 - 1; x <= poolX2 + 1; x++) {
         setBlock(x, G, poolZ1 - 1, BlockType::SANDSTONE);
         setBlock(x, G, poolZ2 + 1, BlockType::SANDSTONE);
@@ -344,103 +339,150 @@ void World::placeStructures() {
     }
 
     // Patio/deck between pool and house
-    fillRect(1, G, -10, 8, 10, BlockType::PLANKS);
+    fillRect(1, G, -12, 8, 12, BlockType::PLANKS);
 
     // ============================================================
-    // HOUSE - L-shape with 45-degree bend at the top of the L
-    // From the aerial: base of L runs east-west, upper arm angles
-    // off at 45 degrees toward the northwest
-    //
-    // Base wing (east-west): X: 10 to 35, Z: -5 to 5 (10 wide)
-    // Angled wing: steps diagonally NW from the west end of the base
-    //   Each segment is 10 wide perpendicular to the diagonal
-    //   Built as stair-stepped 5x10 blocks going -X, -Z
-    // Dark asphalt shingle roof
+    // HOUSE - L-shape with 3 equal segments (each 12 wide x 20 long)
+    //   Seg1 (bottom of L): runs east-west (E-W)
+    //   Seg2 (vertical of L): runs north-south (N-S) from west end of seg1, going north
+    //   Seg3 (top of L): bends northeast at 45 degrees from top of seg2
+    // Orange roof (CLAY)
     // ============================================================
     int hy = G + 1;
     int wallH = 6;
-    int W = 10; // house width (depth)
-    BlockType roofBlock = BlockType::CLAY; // orange roof
+    BlockType roofBlock = BlockType::CLAY;
 
-    // --- Base wing (east-west) ---
-    int bx1 = 10, bx2 = 35, bz1 = -5, bz2 = 5;
-    fillRect(bx1 - 1, G, bz1 - 1, bx2 + 1, bz2 + 1, BlockType::STONE);
-    hollowBox(bx1, hy, bz1, bx2, hy + wallH - 1, bz2,
+    int segLen = 20; // length of each segment
+    int segW = 12;   // width of each segment
+
+    // --- Seg1: bottom of L, runs east-west ---
+    // X: 10 to 29, Z: -6 to 5
+    int s1x1 = 10, s1x2 = s1x1 + segLen - 1; // 10 to 29
+    int s1z1 = -segW / 2, s1z2 = s1z1 + segW - 1; // -6 to 5
+
+    fillRect(s1x1 - 1, G, s1z1 - 1, s1x2 + 1, s1z2 + 1, BlockType::STONE);
+    hollowBox(s1x1, hy, s1z1, s1x2, hy + wallH - 1, s1z2,
               BlockType::COBBLESTONE, BlockType::AIR);
-    fillRect(bx1 + 1, hy, bz1 + 1, bx2 - 1, bz2 - 1, BlockType::PLANKS);
+    fillRect(s1x1 + 1, hy, s1z1 + 1, s1x2 - 1, s1z2 - 1, BlockType::PLANKS);
 
-    // Windows on base wing
-    for (int x = bx1 + 2; x <= bx2 - 2; x += 3) {
+    // Windows on seg1
+    for (int x = s1x1 + 2; x <= s1x2 - 2; x += 3) {
         for (int y = hy + 2; y <= hy + 3; y++) {
-            setBlock(x, y, bz1, BlockType::GLASS); // north
-            setBlock(x, y, bz2, BlockType::GLASS); // south
+            setBlock(x, y, s1z1, BlockType::GLASS);
+            setBlock(x, y, s1z2, BlockType::GLASS);
         }
     }
-    for (int z = bz1 + 2; z <= bz2 - 2; z += 3) {
-        for (int y = hy + 2; y <= hy + 3; y++) {
-            setBlock(bx2, y, z, BlockType::GLASS); // east
-        }
-    }
+    for (int z = s1z1 + 2; z <= s1z2 - 2; z += 3)
+        for (int y = hy + 2; y <= hy + 3; y++)
+            setBlock(s1x2, y, z, BlockType::GLASS);
 
-    // East door (front, facing driveway)
-    int doorZ = (bz1 + bz2) / 2;
-    setBlock(bx2, hy + 1, doorZ, BlockType::AIR);
-    setBlock(bx2, hy + 2, doorZ, BlockType::AIR);
+    // East door
+    int doorZ = (s1z1 + s1z2) / 2;
+    setBlock(s1x2, hy + 1, doorZ, BlockType::AIR);
+    setBlock(s1x2, hy + 2, doorZ, BlockType::AIR);
 
-    // Base wing roof: ridge east-west, peaked north-south
-    for (int x = bx1 - 1; x <= bx2 + 1; x++) {
-        for (int layer = 0; layer <= 3; layer++) {
-            int rz1 = bz1 - 1 + layer;
-            int rz2 = bz2 + 1 - layer;
+    // Seg1 roof: peaked N-S
+    for (int x = s1x1 - 1; x <= s1x2 + 1; x++)
+        for (int layer = 0; layer <= segW / 2; layer++) {
+            int rz1 = s1z1 - 1 + layer;
+            int rz2 = s1z2 + 1 - layer;
             int ry = hy + wallH + layer;
             if (rz1 <= rz2)
                 for (int z = rz1; z <= rz2; z++)
                     setBlock(x, ry, z, roofBlock);
         }
+
+    // --- Seg2: vertical of L, runs north from west end of seg1 ---
+    // Z goes negative = north in Minecraft convention
+    // X: s1x1 - segLen + segW to s1x1 + segW - 1 (overlaps seg1 by segW)
+    // Actually: seg2 starts at west end of seg1 and goes north
+    // X: s1x1 to s1x1 + segW - 1, Z: s1z1 - segLen + segW to s1z1 + segW - 1
+    // But we want it going north (negative Z)
+    int s2x1 = s1x1, s2x2 = s1x1 + segW - 1; // 10 to 21
+    int s2z2 = s1z1 + segW - 1; // overlap with seg1 at the south
+    int s2z1 = s2z2 - segLen + 1; // goes north
+    // s2z1 = -6 + 12 - 1 - 20 + 1 = -6 + 11 - 19 = -14, s2z2 = 5
+
+    fillRect(s2x1 - 1, G, s2z1 - 1, s2x2 + 1, s2z2 + 1, BlockType::STONE);
+    hollowBox(s2x1, hy, s2z1, s2x2, hy + wallH - 1, s2z2,
+              BlockType::COBBLESTONE, BlockType::AIR);
+    fillRect(s2x1 + 1, hy, s2z1 + 1, s2x2 - 1, s2z2 - 1, BlockType::PLANKS);
+
+    // Windows on seg2
+    for (int z = s2z1 + 2; z <= s2z2 - 2; z += 3) {
+        for (int y = hy + 2; y <= hy + 3; y++) {
+            setBlock(s2x1, y, z, BlockType::GLASS);
+            setBlock(s2x2, y, z, BlockType::GLASS);
+        }
+    }
+    for (int x = s2x1 + 2; x <= s2x2 - 2; x += 3)
+        for (int y = hy + 2; y <= hy + 3; y++)
+            setBlock(x, y, s2z1, BlockType::GLASS);
+
+    // West door on seg2
+    int backDoorX = (s2x1 + s2x2) / 2;
+    setBlock(s2x1, hy + 1, (s2z1 + s2z2) / 2, BlockType::AIR);
+    setBlock(s2x1, hy + 2, (s2z1 + s2z2) / 2, BlockType::AIR);
+
+    // Seg2 roof: peaked E-W
+    for (int z = s2z1 - 1; z <= s2z2 + 1; z++)
+        for (int layer = 0; layer <= segW / 2; layer++) {
+            int rx1 = s2x1 - 1 + layer;
+            int rx2 = s2x2 + 1 - layer;
+            int ry = hy + wallH + layer;
+            if (rx1 <= rx2)
+                for (int x = rx1; x <= rx2; x++)
+                    setBlock(x, ry, z, roofBlock);
+        }
+
+    // Remove shared walls between seg1 and seg2
+    {
+        int ox1 = std::max(s1x1, s2x1);
+        int ox2 = std::min(s1x2, s2x2);
+        int oz1 = std::max(s1z1, s2z1);
+        int oz2 = std::min(s1z2, s2z2);
+        for (int x = ox1; x <= ox2; x++)
+            for (int z = oz1; z <= oz2; z++) {
+                for (int y = hy + 1; y < hy + wallH - 1; y++)
+                    setBlock(x, y, z, BlockType::AIR);
+                setBlock(x, hy, z, BlockType::PLANKS);
+            }
     }
 
-    // --- Angled wing: 45-degree diagonal going northwest ---
-    // Built as overlapping segments stepping -X, -Z from the west end
-    // Each segment: 10x10 block, offset by 5 in both X and Z
-    int numSegs = 4;
-    int segW = 10, segD = 10;
-    int stepX = -5, stepZ = -5; // diagonal step per segment
+    // --- Seg3: bends northeast at 45 degrees from top of seg2 ---
+    // Built as stair-stepped sub-segments going +X, -Z from the north end of seg2
+    int numSteps = 4;
+    int stepSize = segLen / numSteps; // 5 blocks per step
+    // Start from north end of seg2
+    int s3startX = s2x2 + 1; // east of seg2 top
+    int s3startZ = s2z1;     // north end of seg2
 
-    // Starting corner (connects to west end of base wing)
-    int startX = bx1 - 3;
-    int startZ = bz1 - 3;
+    for (int s = 0; s < numSteps; s++) {
+        int sx1 = s3startX + s * stepSize;
+        int sz1 = s3startZ - s * stepSize - segW + 1;
+        int sx2 = sx1 + stepSize + segW - 1; // overlap width
+        int sz2 = sz1 + segW - 1;
 
-    for (int s = 0; s < numSegs; s++) {
-        int sx1 = startX + s * stepX;
-        int sz1 = startZ + s * stepZ;
-        int sx2 = sx1 + segW - 1;
-        int sz2 = sz1 + segD - 1;
-
-        // Foundation
         fillRect(sx1 - 1, G, sz1 - 1, sx2 + 1, sz2 + 1, BlockType::STONE);
-
-        // Walls and floor
         hollowBox(sx1, hy, sz1, sx2, hy + wallH - 1, sz2,
                   BlockType::COBBLESTONE, BlockType::AIR);
         fillRect(sx1 + 1, hy, sz1 + 1, sx2 - 1, sz2 - 1, BlockType::PLANKS);
 
-        // Windows on outer edges
-        for (int x = sx1 + 2; x <= sx2 - 2; x += 3) {
+        // Windows
+        for (int x = sx1 + 2; x <= sx2 - 2; x += 3)
             for (int y = hy + 2; y <= hy + 3; y++) {
                 setBlock(x, y, sz1, BlockType::GLASS);
                 setBlock(x, y, sz2, BlockType::GLASS);
             }
-        }
-        for (int z = sz1 + 2; z <= sz2 - 2; z += 3) {
+        for (int z = sz1 + 2; z <= sz2 - 2; z += 3)
             for (int y = hy + 2; y <= hy + 3; y++) {
                 setBlock(sx1, y, z, BlockType::GLASS);
                 setBlock(sx2, y, z, BlockType::GLASS);
             }
-        }
 
-        // Roof for this segment
-        for (int x = sx1 - 1; x <= sx2 + 1; x++) {
-            for (int layer = 0; layer <= 3; layer++) {
+        // Roof
+        for (int x = sx1 - 1; x <= sx2 + 1; x++)
+            for (int layer = 0; layer <= segW / 2; layer++) {
                 int rz1 = sz1 - 1 + layer;
                 int rz2 = sz2 + 1 - layer;
                 int ry = hy + wallH + layer;
@@ -448,92 +490,72 @@ void World::placeStructures() {
                     for (int z = rz1; z <= rz2; z++)
                         setBlock(x, ry, z, roofBlock);
             }
-        }
     }
 
-    // Remove walls between adjacent segments to create open interior
-    for (int s = 0; s < numSegs - 1; s++) {
-        int sx1_a = startX + s * stepX;
-        int sz1_a = startZ + s * stepZ;
-        int sx2_a = sx1_a + segW - 1;
-        int sz2_a = sz1_a + segD - 1;
-        int sx1_b = startX + (s+1) * stepX;
-        int sz1_b = startZ + (s+1) * stepZ;
-        int sx2_b = sx1_b + segW - 1;
-        int sz2_b = sz1_b + segD - 1;
+    // Remove interior walls between seg3 sub-segments
+    for (int s = 0; s < numSteps - 1; s++) {
+        int sx1_a = s3startX + s * stepSize;
+        int sz1_a = s3startZ - s * stepSize - segW + 1;
+        int sx2_a = sx1_a + stepSize + segW - 1;
+        int sz2_a = sz1_a + segW - 1;
+        int sx1_b = s3startX + (s+1) * stepSize;
+        int sz1_b = s3startZ - (s+1) * stepSize - segW + 1;
+        int sx2_b = sx1_b + stepSize + segW - 1;
+        int sz2_b = sz1_b + segW - 1;
 
-        // Overlap region
         int ox1 = std::max(sx1_a, sx1_b);
         int ox2 = std::min(sx2_a, sx2_b);
         int oz1 = std::max(sz1_a, sz1_b);
         int oz2 = std::min(sz2_a, sz2_b);
 
-        for (int x = ox1; x <= ox2; x++) {
+        for (int x = ox1; x <= ox2; x++)
             for (int z = oz1; z <= oz2; z++) {
-                for (int y = hy + 1; y < hy + wallH - 1; y++) {
+                for (int y = hy + 1; y < hy + wallH - 1; y++)
                     setBlock(x, y, z, BlockType::AIR);
-                }
                 setBlock(x, hy, z, BlockType::PLANKS);
             }
-        }
     }
 
-    // Remove walls between base wing and first angled segment
+    // Remove walls between seg2 and first seg3 sub-segment
     {
-        int sx1_0 = startX;
-        int sz1_0 = startZ;
-        int sx2_0 = sx1_0 + segW - 1;
-        int sz2_0 = sz1_0 + segD - 1;
-        int ox1 = std::max(bx1, sx1_0);
-        int ox2 = std::min(bx2, sx2_0);
-        int oz1 = std::max(bz1, sz1_0);
-        int oz2 = std::min(bz2, sz2_0);
+        int sx1_b = s3startX;
+        int sz1_b = s3startZ - segW + 1;
+        int sx2_b = sx1_b + stepSize + segW - 1;
+        int sz2_b = sz1_b + segW - 1;
 
-        for (int x = ox1; x <= ox2; x++) {
+        int ox1 = std::max(s2x1, sx1_b);
+        int ox2 = std::min(s2x2, sx2_b);
+        int oz1 = std::max(s2z1, sz1_b);
+        int oz2 = std::min(s2z2, sz2_b);
+
+        for (int x = ox1; x <= ox2; x++)
             for (int z = oz1; z <= oz2; z++) {
-                for (int y = hy + 1; y < hy + wallH - 1; y++) {
+                for (int y = hy + 1; y < hy + wallH - 1; y++)
                     setBlock(x, y, z, BlockType::AIR);
-                }
                 setBlock(x, hy, z, BlockType::PLANKS);
             }
-        }
     }
 
-    // West door (back, facing pool/patio) on the angled wing
-    int lastSeg = numSegs - 1;
-    int lastSx1 = startX + lastSeg * stepX;
-    int lastSz1 = startZ + lastSeg * stepZ;
-    int lastSz2 = lastSz1 + segD - 1;
-    int backDoorZ = (lastSz1 + lastSz2) / 2;
-    setBlock(lastSx1, hy + 1, backDoorZ, BlockType::AIR);
-    setBlock(lastSx1, hy + 2, backDoorZ, BlockType::AIR);
-
     // ============================================================
-    // TWO-CAR GARAGE - attached to south side of base wing
-    // Garage: X: 22 to 35, Z: 6 to 16 (south of base wing bz2=5)
+    // TWO-CAR GARAGE - attached to south side of seg1
     // ============================================================
-    int gx1 = 22, gx2 = 35, gz1 = bz2 + 1, gz2 = bz2 + 11;
-    // Foundation
+    int gx1 = s1x1 + 6, gx2 = s1x2, gz1 = s1z2 + 1, gz2 = s1z2 + 11;
     fillRect(gx1 - 1, G, gz1 - 1, gx2 + 1, gz2 + 1, BlockType::STONE);
-    // Walls
     hollowBox(gx1, hy, gz1, gx2, hy + wallH - 1, gz2,
               BlockType::COBBLESTONE, BlockType::AIR);
     fillRect(gx1 + 1, hy, gz1 + 1, gx2 - 1, gz2 - 1, BlockType::PLANKS);
 
-    // Remove wall between base wing and garage (shared north wall of garage)
+    // Remove shared wall
     for (int x = gx1 + 1; x <= gx2 - 1; x++)
         for (int y = hy; y < hy + wallH; y++)
             setBlock(x, y, gz1, BlockType::AIR);
-    // Re-floor the shared wall line
     for (int x = gx1 + 1; x <= gx2 - 1; x++)
         setBlock(x, hy, gz1, BlockType::PLANKS);
 
-    // Two garage door openings on south wall (each 5 wide, 4 tall)
-    // Door 1: X: 23 to 27
+    // Two garage doors on south wall
     for (int x = gx1 + 1; x <= gx1 + 5; x++)
         for (int y = hy + 1; y <= hy + 4; y++)
             setBlock(x, y, gz2, BlockType::AIR);
-    // Door 2: X: 29 to 33
     for (int x = gx1 + 7; x <= gx1 + 11; x++)
         for (int y = hy + 1; y <= hy + 4; y++)
             setBlock(x, y, gz2, BlockType::AIR);
@@ -543,8 +565,8 @@ void World::placeStructures() {
         for (int y = hy + 2; y <= hy + 3; y++)
             setBlock(gx2, y, z, BlockType::GLASS);
 
-    // Garage roof: ridge east-west, peaked north-south
-    for (int x = gx1 - 1; x <= gx2 + 1; x++) {
+    // Garage roof
+    for (int x = gx1 - 1; x <= gx2 + 1; x++)
         for (int layer = 0; layer <= 3; layer++) {
             int rz1 = gz1 - 1 + layer;
             int rz2 = gz2 + 1 - layer;
@@ -553,27 +575,26 @@ void World::placeStructures() {
                 for (int z = rz1; z <= rz2; z++)
                     setBlock(x, ry, z, roofBlock);
         }
-    }
 
     // ============================================================
     // CEMENT APRON in front of garage doors
-    // Stone blocks for light cement look
-    // X: gx1-1 to gx2+1, Z: gz2+1 to gz2+6
     // ============================================================
     int apronZ1 = gz2 + 1, apronZ2 = gz2 + 6;
     fillRect(gx1 - 1, G, apronZ1, gx2 + 1, apronZ2, BlockType::STONE);
 
     // ============================================================
-    // DRIVEWAY - black asphalt (BEDROCK for dark look)
+    // CEMENT PAD to the south of the house
+    // ============================================================
+    fillRect(s1x1 - 2, G, s1z2 + 12, s1x2 + 2, s1z2 + 22, BlockType::STONE);
+
+    // ============================================================
+    // DRIVEWAY - black asphalt (BEDROCK)
     // Goes northeast from cement apron, then turns due east
     // ============================================================
-    int driveW = 7; // driveway width
-
-    // Diagonal section: goes northeast (+X, +Z) from apron
-    // Start at center of apron south edge
+    int driveW = 7;
     int driveStartX = (gx1 + gx2) / 2 - driveW / 2;
     int driveStartZ = apronZ2 + 1;
-    int diagLen = 15; // how far the diagonal goes
+    int diagLen = 15;
 
     for (int i = 0; i < diagLen; i++) {
         int cx = driveStartX + i;
@@ -584,49 +605,46 @@ void World::placeStructures() {
         }
     }
 
-    // Straight east section: continues due east from end of diagonal
     int straightStartX = driveStartX + diagLen;
     int straightZ = driveStartZ + diagLen;
-    for (int x = straightStartX; x <= propX2; x++) {
-        for (int z = straightZ - driveW / 2; z <= straightZ + driveW / 2; z++) {
+    for (int x = straightStartX; x <= propX2; x++)
+        for (int z = straightZ - driveW / 2; z <= straightZ + driveW / 2; z++)
             setBlock(x, G, z, BlockType::BEDROCK);
-        }
-    }
 
     // ============================================================
-    // TREES - border the property perimeter
+    // TREES - border the wider property perimeter
     // ============================================================
     struct TreePos { int x, z, h; };
     TreePos trees[] = {
         // North border
-        {-70, -24, 7}, {-60, -24, 8}, {-50, -24, 7}, {-40, -24, 6},
-        {-30, -24, 8}, {-20, -24, 7}, {-10, -24, 6}, {0, -24, 7},
-        {10, -24, 8}, {20, -24, 7}, {30, -24, 6}, {40, -24, 8},
-        {50, -24, 7}, {60, -24, 6}, {70, -24, 7},
+        {-70, -44, 7}, {-60, -44, 8}, {-50, -44, 7}, {-40, -44, 6},
+        {-30, -44, 8}, {-20, -44, 7}, {-10, -44, 6}, {0, -44, 7},
+        {10, -44, 8}, {20, -44, 7}, {30, -44, 6}, {40, -44, 8},
+        {50, -44, 7}, {60, -44, 6}, {70, -44, 7},
         // South border
-        {-70, 24, 8}, {-60, 24, 7}, {-50, 24, 6}, {-40, 24, 8},
-        {-30, 24, 7}, {-20, 24, 6}, {-10, 24, 7}, {0, 24, 8},
-        {10, 24, 7}, {20, 24, 6}, {30, 24, 8}, {40, 24, 7},
-        {50, 24, 6}, {60, 24, 8}, {70, 24, 7},
-        // West border (around pond)
-        {-78, -15, 7}, {-78, -5, 8}, {-78, 5, 7}, {-78, 15, 6},
-        // Between pond and pool (open green area with scattered trees)
-        {-45, -18, 7}, {-38, 16, 8}, {-48, 10, 6}, {-35, -10, 7},
-        {-42, 5, 8}, {-30, -16, 6}, {-25, 14, 7},
+        {-70, 44, 8}, {-60, 44, 7}, {-50, 44, 6}, {-40, 44, 8},
+        {-30, 44, 7}, {-20, 44, 6}, {-10, 44, 7}, {0, 44, 8},
+        {10, 44, 7}, {20, 44, 6}, {30, 44, 8}, {40, 44, 7},
+        {50, 44, 6}, {60, 44, 8}, {70, 44, 7},
+        // West border
+        {-78, -35, 7}, {-78, -20, 8}, {-78, -5, 7}, {-78, 10, 6},
+        {-78, 25, 7}, {-78, 35, 8},
+        // Between pond and pool (open green with scattered trees)
+        {-45, -30, 7}, {-38, 28, 8}, {-48, 15, 6}, {-35, -18, 7},
+        {-42, 5, 8}, {-30, -28, 6}, {-25, 22, 7}, {-45, 20, 6},
+        {-35, -35, 7}, {-28, 32, 8},
         // Around house
-        {8, -18, 7}, {8, 16, 8}, {25, 16, 7}, {32, 16, 6},
-        {32, -18, 8},
+        {8, -30, 7}, {8, 28, 8}, {25, 28, 7}, {32, 28, 6},
+        {32, -30, 8},
         // Along driveway (east)
-        {45, -15, 7}, {55, -15, 8}, {65, -15, 7},
-        {45, 15, 6}, {55, 15, 7}, {65, 15, 8},
+        {45, -25, 7}, {55, -25, 8}, {65, -25, 7},
+        {45, 25, 6}, {55, 25, 7}, {65, 25, 8},
     };
 
-    for (auto& t : trees) {
+    for (auto& t : trees)
         placeTree(t.x, G + 1, t.z, t.h);
-    }
 
     // Mark all chunks as dirty so meshes rebuild
-    for (auto& [key, chunk] : chunks_) {
+    for (auto& [key, chunk] : chunks_)
         chunk->dirty = true;
-    }
 }
