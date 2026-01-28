@@ -1,50 +1,88 @@
 # Minecraft World Generator
 
-A procedural Minecraft world generator written in Python. Generates terrain with biomes, caves, ores, trees, and other features using Perlin noise.
+A 3D Minecraft-style voxel world built in C++ with OpenGL. Features procedural terrain generation and a custom property scene with house, pool, pond, and driveway.
 
 ## Features
 
-- **7 biomes**: Plains, Desert, Forest, Mountains, Ocean, Tundra, Swamp
-- **21 block types**: Stone, ores, wood, leaves, water, lava, and more
-- **Terrain generation**: Multi-octave Perlin noise for realistic heightmaps
-- **Cave systems**: Underground cave generation with lava at low levels
-- **Ore distribution**: Diamond, gold, iron, and coal at appropriate depths
-- **Decorations**: Trees in forests/plains, cacti in deserts
-- **Chunk-based**: 16x16x256 chunks with lazy generation
-- **Save/Load**: gzip-compressed JSON world persistence
+- **3D rendering**: OpenGL 3.3 core profile with textured blocks
+- **Procedural terrain**: Multi-octave Perlin/simplex noise via FastNoiseLite
+- **4 biomes**: Plains, Desert, Forest, Tundra
+- **22 block types**: Stone, ores, wood, leaves, water, glass, and more
+- **Chunk-based world**: 16x16x256 chunks with lazy generation
+- **Face culling**: Only renders visible faces for performance
+- **Procedural textures**: 16x16 texture atlas generated at runtime
+- **FPS camera**: WASD + mouse controls with fly mode
+- **Custom scene**: Property with L-shaped house, pool, pond, garage, and driveway
 
-## Usage
+## Requirements
+
+- CMake 3.10+
+- C++17 compiler (g++, clang++)
+- OpenGL 3.3+
+- GLFW3
+- GLEW
+
+### Install dependencies (Ubuntu/Debian)
 
 ```bash
-# Create a world with default settings
-python main.py
-
-# Create with a specific seed
-python main.py --seed 42
-
-# Save the world
-python main.py --seed 42 --save saves/my_world
-
-# Load a saved world
-python main.py --load saves/my_world
-
-# Generate larger spawn area
-python main.py --radius 4
-
-# View a specific Y level
-python main.py --slice-y 30
+sudo apt-get install cmake build-essential libglfw3-dev libglew-dev
 ```
+
+## Build & Run
+
+```bash
+cd cpp
+mkdir build && cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release
+cmake --build .
+./minecraft
+```
+
+## Controls
+
+| Key | Action |
+|-----|--------|
+| W/A/S/D | Move forward/left/back/right |
+| Mouse | Look around |
+| Space | Fly up |
+| Left Shift | Fly down |
+| Left Ctrl | Sprint (3x speed) |
+| F3 | Toggle wireframe mode |
+| Escape | Quit |
 
 ## Project Structure
 
 ```
-├── main.py              # Entry point and CLI
-└── world/
-    ├── __init__.py
-    ├── block.py         # Block type definitions
-    ├── biome.py         # Biome definitions and properties
-    ├── chunk.py         # 16x16x256 chunk storage
-    ├── noise.py         # Perlin noise generator
-    ├── generator.py     # Terrain and feature generation
-    └── world.py         # World management and persistence
+cpp/
+├── CMakeLists.txt
+├── include/
+│   ├── block.h          # Block type definitions
+│   ├── camera.h         # FPS camera
+│   ├── chunk.h          # 16x16x256 chunk storage
+│   ├── chunk_mesh.h     # Mesh builder with face culling
+│   ├── shader.h         # GLSL shader loader
+│   ├── texture.h        # Procedural texture atlas
+│   └── world.h          # World manager
+├── src/
+│   ├── main.cpp         # Entry point and game loop
+│   ├── block.cpp
+│   ├── camera.cpp
+│   ├── chunk.cpp
+│   ├── chunk_mesh.cpp
+│   ├── shader.cpp
+│   ├── texture.cpp
+│   └── world.cpp        # Terrain generation and structures
+├── shaders/
+│   ├── vertex.glsl
+│   └── fragment.glsl
+└── lib/
+    └── FastNoiseLite.h  # Header-only noise library
 ```
+
+## Libraries
+
+- [GLFW](https://www.glfw.org/) - Window and input
+- [GLEW](http://glew.sourceforge.net/) - OpenGL extension loading
+- [GLM](https://github.com/g-truc/glm) - Math library (header-only)
+- [FastNoiseLite](https://github.com/Auburn/FastNoiseLite) - Noise generation (header-only)
+- [stb_image](https://github.com/nothings/stb) - Image loading (header-only)
