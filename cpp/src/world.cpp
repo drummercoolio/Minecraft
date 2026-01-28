@@ -85,12 +85,7 @@ void World::generateTerrain(Chunk& chunk) {
             int baseHeight;
             BlockType surface, subsurface;
 
-            if (biome < -0.4f) {
-                // Ocean
-                baseHeight = 40 + (int)((h + 1.0f) * 8);
-                surface = BlockType::SAND;
-                subsurface = BlockType::GRAVEL;
-            } else if (biome < -0.1f) {
+            if (biome < -0.2f) {
                 // Plains
                 baseHeight = 64 + (int)((h + 1.0f) * 4);
                 surface = BlockType::GRASS;
@@ -105,11 +100,6 @@ void World::generateTerrain(Chunk& chunk) {
                 baseHeight = 66 + (int)((h + 1.0f) * 3);
                 surface = BlockType::SAND;
                 subsurface = BlockType::SANDSTONE;
-            } else if (biome < 0.65f) {
-                // Mountains
-                baseHeight = 72 + (int)((h + 1.0f) * 25);
-                surface = BlockType::STONE;
-                subsurface = BlockType::STONE;
             } else {
                 // Tundra
                 baseHeight = 63 + (int)((h + 1.0f) * 3);
@@ -418,16 +408,9 @@ void World::placeStructures() {
     // ============================================================
     // DRIVEWAY - coming from the south, gravel path
     // ============================================================
-    for (int z = sz2 + 2; z <= 45; z++) {
+    for (int z = sz2 + 2; z <= 55; z++) {
         for (int x = -2; x <= 4; x++) {
             setBlock(x, G, z, BlockType::GRAVEL);
-        }
-    }
-    // Curve the driveway east toward a "road"
-    for (int i = 0; i < 15; i++) {
-        for (int x = 4 + i; x <= 6 + i; x++) {
-            for (int dx = -2; dx <= 4; dx++)
-                setBlock(x, G, 45 - i + dx, BlockType::GRAVEL);
         }
     }
 
