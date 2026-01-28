@@ -284,376 +284,262 @@ void World::placeStructures() {
     if (structuresPlaced_) return;
     structuresPlaced_ = true;
 
-    // Ground level
-    const int G = 64;
+    const int G = 64; // Ground level
+    const float SCALE = 3.0f; // 1 block = 3 feet
 
-    // Property wider N-S, longer E for driveway: X: -80 to 120, Z: -45 to 45
-    int propX1 = -80, propX2 = 120, propZ1 = -45, propZ2 = 45;
+    // User's angle system: 0°=West, 90°=North, 180°=East, 270°=South
+    // Convert to standard bearing: standard = (user + 270) % 360
+    // Movement: dx = sin(bearing), dz = -cos(bearing)
+    auto userToStandard = [](float userDeg) {
+        return fmodf(userDeg + 270.0f, 360.0f);
+    };
+    auto degToRad = [](float deg) { return deg * 3.14159265f / 180.0f; };
+    auto moveDir = [&](float userDeg, float dist, float& x, float& z) {
+        float stdDeg = userToStandard(userDeg);
+        float rad = degToRad(stdDeg);
+        x += sinf(rad) * dist / SCALE;
+        z += -cosf(rad) * dist / SCALE;
+    };
 
-    // === Flatten the property ===
-    for (int x = propX1 - 5; x <= propX2 + 5; x++) {
-        for (int z = propZ1 - 5; z <= propZ2 + 5; z++) {
-            for (int y = G + 1; y < G + 40; y++)
-                setBlock(x, y, z, BlockType::AIR);
-            setBlock(x, G, z, BlockType::GRASS);
-            for (int y = G - 1; y >= G - 4; y--)
-                setBlock(x, y, z, BlockType::DIRT);
-        }
+    // ============================================================
+    // LOT BOUNDARY - starting from NE corner (point of origin)
+    // ============================================================
+    std::vector<std::pair<float, float>> lotVerts;
+    float lx = 0, lz = 0;
+    lotVerts.push_back({lx, lz}); // NE corner
+
+    // Southern boundary runs west for 414 ft
+    moveDir(0, 414, lx, lz); lotVerts.push_back({lx, lz});
+    // 300° SW for 140 ft
+    moveDir(300, 140, lx, lz); lotVerts.push_back({lx, lz});
+    // West for 120 ft
+    moveDir(0, 120, lx, lz); lotVerts.push_back({lx, lz});
+    // 320° SW for 218 ft
+    moveDir(320, 218, lx, lz); lotVerts.push_back({lx, lz});
+    // 80° NW for 350 ft
+    moveDir(80, 350, lx, lz); lotVerts.push_back({lx, lz});
+    // 180° east for 935 ft back to start (force closure)
+    lotVerts.push_back({0, 0});
+
+    // Find lot bounding box
+    float lotMinX = 1e9, lotMaxX = -1e9, lotMinZ = 1e9, lotMaxZ = -1e9;
+    for (auto& v : lotVerts) {
+        lotMinX = std::min(lotMinX, v.first);
+        lotMaxX = std::max(lotMaxX, v.first);
+        lotMinZ = std::min(lotMinZ, v.second);
+        lotMaxZ = std::max(lotMaxZ, v.second);
     }
 
+    // Point-in-polygon test (ray casting)
+    auto pointInLot = [&](float px, float pz) -> bool {
+        int n = lotVerts.size();
+        bool inside = false;
+        for (int i = 0, j = n - 1; i < n; j = i++) {
+            float xi = lotVerts[i].first, zi = lotVerts[i].second;
+            float xj = lotVerts[j].first, zj = lotVerts[j].second;
+            if (((zi > pz) != (zj > pz)) &&
+                (px < (xj - xi) * (pz - zi) / (zj - zi) + xi))
+                inside = !inside;
+        }
+        return inside;
+    };
+
     // ============================================================
-    // POND - spans full width (Z) at the west end
-    // X: -75 to -55, Z: -40 to 40
+    // HOUSE OUTLINE - traced from surveyor description
+    // House placed 438 feet from eastern boundary = 146 blocks from east
     // ============================================================
-    int pondX1 = -75, pondX2 = -55, pondZ1 = -40, pondZ2 = 40;
-    for (int x = pondX1 - 2; x <= pondX2 + 2; x++) {
-        for (int z = pondZ1 - 2; z <= pondZ2 + 2; z++) {
-            float nx = (float)(x - (pondX1 + pondX2) / 2) / ((pondX2 - pondX1) / 2.0f);
-            float nz = (float)(z - (pondZ1 + pondZ2) / 2) / ((pondZ2 - pondZ1) / 2.0f);
-            float dist = sqrtf(nx * nx + nz * nz);
-            if (dist < 0.9f) {
-                setBlock(x, G, z, BlockType::WATER);
-                setBlock(x, G - 1, z, BlockType::CLAY);
-                setBlock(x, G - 2, z, BlockType::CLAY);
-                setBlock(x, G - 3, z, BlockType::CLAY);
-            } else if (dist < 1.05f) {
-                setBlock(x, G, z, BlockType::SAND);
+    std::vector<std::pair<float, float>> houseVerts;
+    float houseOffsetX = -438.0f / SCALE; // 438 ft from east boundary (which is at x=0)
+    float houseOffsetZ = -181.0f / SCALE / 2; // Centered N-S (181 ft total N-S span)
+
+    float hx = 0, hz = 0;
+    houseVerts.push_back({hx, hz}); // Starting point
+
+    // Trace house outline per surveyor description
+    moveDir(0, 35, hx, hz); houseVerts.push_back({hx, hz});     // west 35 ft
+    moveDir(90, 5, hx, hz); houseVerts.push_back({hx, hz});     // north 5 ft
+    moveDir(0, 25, hx, hz); houseVerts.push_back({hx, hz});     // west 25 ft
+    moveDir(90, 35, hx, hz); houseVerts.push_back({hx, hz});    // north 35 ft
+    moveDir(60, 16, hx, hz); houseVerts.push_back({hx, hz});    // 60° NW 16 ft
+    moveDir(120, 16, hx, hz); houseVerts.push_back({hx, hz});   // 120° NE 16 ft
+    moveDir(20, 5, hx, hz); houseVerts.push_back({hx, hz});     // 20° NW 5 ft
+    moveDir(120, 45, hx, hz); houseVerts.push_back({hx, hz});   // 120° NE 45 ft
+    moveDir(210, 40, hx, hz); houseVerts.push_back({hx, hz});   // 210° SE 40 ft
+    moveDir(300, 32, hx, hz); houseVerts.push_back({hx, hz});   // 300° SW 32 ft
+    moveDir(270, 14, hx, hz); houseVerts.push_back({hx, hz});   // south 14 ft
+    moveDir(180, 3.5, hx, hz); houseVerts.push_back({hx, hz});  // east 3.5 ft
+    moveDir(270, 15, hx, hz); houseVerts.push_back({hx, hz});   // south 15 ft
+    moveDir(180, 23, hx, hz); houseVerts.push_back({hx, hz});   // east 23 ft
+    // south 32 ft back to origin (force closure)
+    houseVerts.push_back({0, 0});
+
+    // Offset house vertices to final position
+    for (auto& v : houseVerts) {
+        v.first += houseOffsetX;
+        v.second += houseOffsetZ;
+    }
+
+    // Find house bounding box
+    float houseMinX = 1e9, houseMaxX = -1e9, houseMinZ = 1e9, houseMaxZ = -1e9;
+    for (auto& v : houseVerts) {
+        houseMinX = std::min(houseMinX, v.first);
+        houseMaxX = std::max(houseMaxX, v.first);
+        houseMinZ = std::min(houseMinZ, v.second);
+        houseMaxZ = std::max(houseMaxZ, v.second);
+    }
+
+    // Point-in-house test
+    auto pointInHouse = [&](float px, float pz) -> bool {
+        int n = houseVerts.size();
+        bool inside = false;
+        for (int i = 0, j = n - 1; i < n; j = i++) {
+            float xi = houseVerts[i].first, zi = houseVerts[i].second;
+            float xj = houseVerts[j].first, zj = houseVerts[j].second;
+            if (((zi > pz) != (zj > pz)) &&
+                (px < (xj - xi) * (pz - zi) / (zj - zi) + xi))
+                inside = !inside;
+        }
+        return inside;
+    };
+
+    // ============================================================
+    // FILL LOT WITH GRASS (only inside lot boundary)
+    // ============================================================
+    int iMinX = (int)floorf(lotMinX) - 5;
+    int iMaxX = (int)ceilf(lotMaxX) + 5;
+    int iMinZ = (int)floorf(lotMinZ) - 5;
+    int iMaxZ = (int)ceilf(lotMaxZ) + 5;
+
+    for (int x = iMinX; x <= iMaxX; x++) {
+        for (int z = iMinZ; z <= iMaxZ; z++) {
+            bool inLot = pointInLot((float)x, (float)z);
+            // Clear air above ground
+            for (int y = G + 1; y < G + 40; y++)
+                setBlock(x, y, z, BlockType::AIR);
+
+            if (inLot) {
+                setBlock(x, G, z, BlockType::GRASS);
+                for (int y = G - 1; y >= G - 4; y--)
+                    setBlock(x, y, z, BlockType::DIRT);
+            } else {
+                // Outside lot - leave as generated terrain or stone
+                setBlock(x, G, z, BlockType::STONE);
+                for (int y = G - 1; y >= G - 4; y--)
+                    setBlock(x, y, z, BlockType::STONE);
             }
         }
     }
 
     // ============================================================
-    // POOL - between open green and house
-    // X: -15 to 0, Z: -10 to 10
-    // ============================================================
-    int poolX1 = -8, poolX2 = 0, poolZ1 = -10, poolZ2 = 10;
-    fillBox(poolX1, G - 3, poolZ1, poolX2, G, poolZ2, BlockType::STONE);
-    fillBox(poolX1 + 1, G - 2, poolZ1 + 1, poolX2 - 1, G, poolZ2 - 1, BlockType::WATER);
-    for (int x = poolX1 - 1; x <= poolX2 + 1; x++) {
-        setBlock(x, G, poolZ1 - 1, BlockType::SANDSTONE);
-        setBlock(x, G, poolZ2 + 1, BlockType::SANDSTONE);
-    }
-    for (int z = poolZ1 - 1; z <= poolZ2 + 1; z++) {
-        setBlock(poolX1 - 1, G, z, BlockType::SANDSTONE);
-        setBlock(poolX2 + 1, G, z, BlockType::SANDSTONE);
-    }
-
-    // Patio/deck between pool and house
-    fillRect(1, G, -12, 8, 12, BlockType::PLANKS);
-
-    // ============================================================
-    // HOUSE - L-shape with 3 equal segments (each 12 wide x 20 long)
-    //   Seg1 (bottom of L): runs east-west (E-W)
-    //   Seg2 (vertical of L): runs north-south (N-S) from west end of seg1, going north
-    //   Seg3 (top of L): bends northeast at 45 degrees from top of seg2
-    // Orange roof (CLAY)
+    // BUILD HOUSE WALLS AND ROOF
     // ============================================================
     int hy = G + 1;
     int wallH = 6;
     BlockType roofBlock = BlockType::CLAY;
+    BlockType wallBlock = BlockType::COBBLESTONE;
 
-    int segLen = 20; // length of each segment
-    int segW = 12;   // width of each segment
+    // Draw walls along house polygon edges
+    for (size_t i = 0; i < houseVerts.size(); i++) {
+        size_t j = (i + 1) % houseVerts.size();
+        float x1 = houseVerts[i].first, z1 = houseVerts[i].second;
+        float x2 = houseVerts[j].first, z2 = houseVerts[j].second;
 
-    // --- Seg1: bottom of L, runs east-west ---
-    // X: 10 to 29, Z: -6 to 5
-    int s1x1 = 10, s1x2 = s1x1 + segLen - 1; // 10 to 29
-    int s1z1 = -segW / 2, s1z2 = s1z1 + segW - 1; // -6 to 5
+        // Bresenham-like line for walls
+        float dx = x2 - x1, dz = z2 - z1;
+        float len = sqrtf(dx * dx + dz * dz);
+        if (len < 0.5f) continue;
 
-    fillRect(s1x1 - 1, G, s1z1 - 1, s1x2 + 1, s1z2 + 1, BlockType::STONE);
-    hollowBox(s1x1, hy, s1z1, s1x2, hy + wallH - 1, s1z2,
-              BlockType::COBBLESTONE, BlockType::AIR);
-    fillRect(s1x1 + 1, hy, s1z1 + 1, s1x2 - 1, s1z2 - 1, BlockType::PLANKS);
+        int steps = (int)ceilf(len);
+        for (int s = 0; s <= steps; s++) {
+            float t = (float)s / (float)steps;
+            int wx = (int)roundf(x1 + dx * t);
+            int wz = (int)roundf(z1 + dz * t);
 
-    // Windows on seg1
-    for (int x = s1x1 + 2; x <= s1x2 - 2; x += 3) {
-        for (int y = hy + 2; y <= hy + 3; y++) {
-            setBlock(x, y, s1z1, BlockType::GLASS);
-            setBlock(x, y, s1z2, BlockType::GLASS);
+            // Build wall column
+            for (int y = hy; y < hy + wallH; y++) {
+                setBlock(wx, y, wz, wallBlock);
+            }
         }
     }
-    for (int z = s1z1 + 2; z <= s1z2 - 2; z += 3)
-        for (int y = hy + 2; y <= hy + 3; y++)
-            setBlock(s1x2, y, z, BlockType::GLASS);
 
-    // East door
-    int doorZ = (s1z1 + s1z2) / 2;
-    setBlock(s1x2, hy + 1, doorZ, BlockType::AIR);
-    setBlock(s1x2, hy + 2, doorZ, BlockType::AIR);
+    // Fill house floor and interior
+    int ihMinX = (int)floorf(houseMinX);
+    int ihMaxX = (int)ceilf(houseMaxX);
+    int ihMinZ = (int)floorf(houseMinZ);
+    int ihMaxZ = (int)ceilf(houseMaxZ);
 
-    // Seg1 roof: peaked N-S
-    for (int x = s1x1 - 1; x <= s1x2 + 1; x++)
-        for (int layer = 0; layer <= segW / 2; layer++) {
-            int rz1 = s1z1 - 1 + layer;
-            int rz2 = s1z2 + 1 - layer;
-            int ry = hy + wallH + layer;
-            if (rz1 <= rz2)
-                for (int z = rz1; z <= rz2; z++)
-                    setBlock(x, ry, z, roofBlock);
-        }
-
-    // --- Seg2: vertical of L, runs north from west end of seg1 ---
-    // Z goes negative = north in Minecraft convention
-    // X: s1x1 - segLen + segW to s1x1 + segW - 1 (overlaps seg1 by segW)
-    // Actually: seg2 starts at west end of seg1 and goes north
-    // X: s1x1 to s1x1 + segW - 1, Z: s1z1 - segLen + segW to s1z1 + segW - 1
-    // But we want it going north (negative Z)
-    int s2x1 = s1x1, s2x2 = s1x1 + segW - 1; // 10 to 21
-    int s2z2 = s1z1 + segW - 1; // overlap with seg1 at the south
-    int s2z1 = s2z2 - segLen + 1; // goes north
-    // s2z1 = -6 + 12 - 1 - 20 + 1 = -6 + 11 - 19 = -14, s2z2 = 5
-
-    fillRect(s2x1 - 1, G, s2z1 - 1, s2x2 + 1, s2z2 + 1, BlockType::STONE);
-    hollowBox(s2x1, hy, s2z1, s2x2, hy + wallH - 1, s2z2,
-              BlockType::COBBLESTONE, BlockType::AIR);
-    fillRect(s2x1 + 1, hy, s2z1 + 1, s2x2 - 1, s2z2 - 1, BlockType::PLANKS);
-
-    // Windows on seg2
-    for (int z = s2z1 + 2; z <= s2z2 - 2; z += 3) {
-        for (int y = hy + 2; y <= hy + 3; y++) {
-            setBlock(s2x1, y, z, BlockType::GLASS);
-            setBlock(s2x2, y, z, BlockType::GLASS);
-        }
-    }
-    for (int x = s2x1 + 2; x <= s2x2 - 2; x += 3)
-        for (int y = hy + 2; y <= hy + 3; y++)
-            setBlock(x, y, s2z1, BlockType::GLASS);
-
-    // West door on seg2
-    int backDoorX = (s2x1 + s2x2) / 2;
-    setBlock(s2x1, hy + 1, (s2z1 + s2z2) / 2, BlockType::AIR);
-    setBlock(s2x1, hy + 2, (s2z1 + s2z2) / 2, BlockType::AIR);
-
-    // Seg2 roof: peaked E-W
-    for (int z = s2z1 - 1; z <= s2z2 + 1; z++)
-        for (int layer = 0; layer <= segW / 2; layer++) {
-            int rx1 = s2x1 - 1 + layer;
-            int rx2 = s2x2 + 1 - layer;
-            int ry = hy + wallH + layer;
-            if (rx1 <= rx2)
-                for (int x = rx1; x <= rx2; x++)
-                    setBlock(x, ry, z, roofBlock);
-        }
-
-    // Remove shared walls between seg1 and seg2
-    {
-        int ox1 = std::max(s1x1, s2x1);
-        int ox2 = std::min(s1x2, s2x2);
-        int oz1 = std::max(s1z1, s2z1);
-        int oz2 = std::min(s1z2, s2z2);
-        for (int x = ox1; x <= ox2; x++)
-            for (int z = oz1; z <= oz2; z++) {
-                for (int y = hy + 1; y < hy + wallH - 1; y++)
+    for (int x = ihMinX; x <= ihMaxX; x++) {
+        for (int z = ihMinZ; z <= ihMaxZ; z++) {
+            if (pointInHouse((float)x, (float)z)) {
+                setBlock(x, G, z, BlockType::STONE); // Foundation
+                setBlock(x, hy, z, BlockType::PLANKS); // Floor
+                // Clear interior
+                for (int y = hy + 1; y < hy + wallH; y++)
                     setBlock(x, y, z, BlockType::AIR);
-                setBlock(x, hy, z, BlockType::PLANKS);
             }
-    }
-
-    // --- Seg3: bends northeast at 45 degrees from top of seg2 ---
-    // Built as stair-stepped sub-segments going +X, -Z from the north end of seg2
-    int numSteps = 4;
-    int stepSize = segLen / numSteps; // 5 blocks per step
-    // Start from north end of seg2
-    int s3startX = s2x2 + 1; // east of seg2 top
-    int s3startZ = s2z1;     // north end of seg2
-
-    for (int s = 0; s < numSteps; s++) {
-        int sx1 = s3startX + s * stepSize;
-        int sz1 = s3startZ - s * stepSize - segW + 1;
-        int sx2 = sx1 + stepSize + segW - 1; // overlap width
-        int sz2 = sz1 + segW - 1;
-
-        fillRect(sx1 - 1, G, sz1 - 1, sx2 + 1, sz2 + 1, BlockType::STONE);
-        hollowBox(sx1, hy, sz1, sx2, hy + wallH - 1, sz2,
-                  BlockType::COBBLESTONE, BlockType::AIR);
-        fillRect(sx1 + 1, hy, sz1 + 1, sx2 - 1, sz2 - 1, BlockType::PLANKS);
-
-        // Windows
-        for (int x = sx1 + 2; x <= sx2 - 2; x += 3)
-            for (int y = hy + 2; y <= hy + 3; y++) {
-                setBlock(x, y, sz1, BlockType::GLASS);
-                setBlock(x, y, sz2, BlockType::GLASS);
-            }
-        for (int z = sz1 + 2; z <= sz2 - 2; z += 3)
-            for (int y = hy + 2; y <= hy + 3; y++) {
-                setBlock(sx1, y, z, BlockType::GLASS);
-                setBlock(sx2, y, z, BlockType::GLASS);
-            }
-
-        // Roof
-        for (int x = sx1 - 1; x <= sx2 + 1; x++)
-            for (int layer = 0; layer <= segW / 2; layer++) {
-                int rz1 = sz1 - 1 + layer;
-                int rz2 = sz2 + 1 - layer;
-                int ry = hy + wallH + layer;
-                if (rz1 <= rz2)
-                    for (int z = rz1; z <= rz2; z++)
-                        setBlock(x, ry, z, roofBlock);
-            }
-    }
-
-    // Remove interior walls between seg3 sub-segments
-    for (int s = 0; s < numSteps - 1; s++) {
-        int sx1_a = s3startX + s * stepSize;
-        int sz1_a = s3startZ - s * stepSize - segW + 1;
-        int sx2_a = sx1_a + stepSize + segW - 1;
-        int sz2_a = sz1_a + segW - 1;
-        int sx1_b = s3startX + (s+1) * stepSize;
-        int sz1_b = s3startZ - (s+1) * stepSize - segW + 1;
-        int sx2_b = sx1_b + stepSize + segW - 1;
-        int sz2_b = sz1_b + segW - 1;
-
-        int ox1 = std::max(sx1_a, sx1_b);
-        int ox2 = std::min(sx2_a, sx2_b);
-        int oz1 = std::max(sz1_a, sz1_b);
-        int oz2 = std::min(sz2_a, sz2_b);
-
-        for (int x = ox1; x <= ox2; x++)
-            for (int z = oz1; z <= oz2; z++) {
-                for (int y = hy + 1; y < hy + wallH - 1; y++)
-                    setBlock(x, y, z, BlockType::AIR);
-                setBlock(x, hy, z, BlockType::PLANKS);
-            }
-    }
-
-    // Remove walls between seg2 and first seg3 sub-segment
-    {
-        int sx1_b = s3startX;
-        int sz1_b = s3startZ - segW + 1;
-        int sx2_b = sx1_b + stepSize + segW - 1;
-        int sz2_b = sz1_b + segW - 1;
-
-        int ox1 = std::max(s2x1, sx1_b);
-        int ox2 = std::min(s2x2, sx2_b);
-        int oz1 = std::max(s2z1, sz1_b);
-        int oz2 = std::min(s2z2, sz2_b);
-
-        for (int x = ox1; x <= ox2; x++)
-            for (int z = oz1; z <= oz2; z++) {
-                for (int y = hy + 1; y < hy + wallH - 1; y++)
-                    setBlock(x, y, z, BlockType::AIR);
-                setBlock(x, hy, z, BlockType::PLANKS);
-            }
-    }
-
-    // ============================================================
-    // TWO-CAR GARAGE - attached to south side of seg1
-    // ============================================================
-    int gx1 = s1x1 + 6, gx2 = s1x2, gz1 = s1z2 + 1, gz2 = s1z2 + 11;
-    fillRect(gx1 - 1, G, gz1 - 1, gx2 + 1, gz2 + 1, BlockType::STONE);
-    hollowBox(gx1, hy, gz1, gx2, hy + wallH - 1, gz2,
-              BlockType::COBBLESTONE, BlockType::AIR);
-    fillRect(gx1 + 1, hy, gz1 + 1, gx2 - 1, gz2 - 1, BlockType::PLANKS);
-
-    // Remove shared wall
-    for (int x = gx1 + 1; x <= gx2 - 1; x++)
-        for (int y = hy; y < hy + wallH; y++)
-            setBlock(x, y, gz1, BlockType::AIR);
-    for (int x = gx1 + 1; x <= gx2 - 1; x++)
-        setBlock(x, hy, gz1, BlockType::PLANKS);
-
-    // Two garage doors on south wall
-    for (int x = gx1 + 1; x <= gx1 + 5; x++)
-        for (int y = hy + 1; y <= hy + 4; y++)
-            setBlock(x, y, gz2, BlockType::AIR);
-    for (int x = gx1 + 7; x <= gx1 + 11; x++)
-        for (int y = hy + 1; y <= hy + 4; y++)
-            setBlock(x, y, gz2, BlockType::AIR);
-
-    // Windows on east wall of garage
-    for (int z = gz1 + 2; z <= gz2 - 2; z += 3)
-        for (int y = hy + 2; y <= hy + 3; y++)
-            setBlock(gx2, y, z, BlockType::GLASS);
-
-    // Garage roof
-    for (int x = gx1 - 1; x <= gx2 + 1; x++)
-        for (int layer = 0; layer <= 3; layer++) {
-            int rz1 = gz1 - 1 + layer;
-            int rz2 = gz2 + 1 - layer;
-            int ry = hy + wallH + layer;
-            if (rz1 <= rz2)
-                for (int z = rz1; z <= rz2; z++)
-                    setBlock(x, ry, z, roofBlock);
-        }
-
-    // ============================================================
-    // CEMENT APRON in front of garage doors
-    // ============================================================
-    int apronZ1 = gz2 + 1, apronZ2 = gz2 + 6;
-    fillRect(gx1 - 1, G, apronZ1, gx2 + 1, apronZ2, BlockType::STONE);
-
-    // ============================================================
-    // CEMENT PAD to the south of the house
-    // ============================================================
-    fillRect(s1x1 - 2, G, s1z2 + 12, s1x2 + 2, s1z2 + 22, BlockType::STONE);
-
-    // ============================================================
-    // DRIVEWAY - black asphalt (BEDROCK)
-    // Goes northeast from cement apron, then turns due east
-    // ============================================================
-    int driveW = 7;
-
-    // Driveway starts at east end of apron, shifted east to clear house
-    int driveStartX = gx2 + 2;
-    int driveStartZ = (apronZ1 + apronZ2) / 2;
-    int diagLen = 15;
-
-    // Connect apron to driveway start
-    for (int x = gx2 + 1; x <= driveStartX; x++)
-        for (int z = driveStartZ - driveW / 2; z <= driveStartZ + driveW / 2; z++)
-            setBlock(x, G, z, BlockType::BEDROCK);
-
-    // Diagonal section: goes northeast (+X, -Z) like a forward slash /
-    for (int i = 0; i < diagLen; i++) {
-        int cx = driveStartX + i;
-        int cz = driveStartZ - i;
-        for (int w = 0; w < driveW; w++) {
-            setBlock(cx + w, G, cz, BlockType::BEDROCK);
-            setBlock(cx + w, G, cz - 1, BlockType::BEDROCK);
         }
     }
 
-    // Straight east section from top of the forward slash
-    int straightStartX = driveStartX + diagLen;
-    int straightZ = driveStartZ - diagLen;
-    for (int x = straightStartX; x <= propX2; x++)
-        for (int z = straightZ - driveW / 2; z <= straightZ + driveW / 2; z++)
-            setBlock(x, G, z, BlockType::BEDROCK);
+    // Add windows along walls (every 4 blocks)
+    for (size_t i = 0; i < houseVerts.size(); i++) {
+        size_t j = (i + 1) % houseVerts.size();
+        float x1 = houseVerts[i].first, z1 = houseVerts[i].second;
+        float x2 = houseVerts[j].first, z2 = houseVerts[j].second;
+
+        float dx = x2 - x1, dz = z2 - z1;
+        float len = sqrtf(dx * dx + dz * dz);
+        if (len < 4.0f) continue;
+
+        int steps = (int)ceilf(len);
+        for (int s = 4; s <= steps - 2; s += 4) {
+            float t = (float)s / (float)steps;
+            int wx = (int)roundf(x1 + dx * t);
+            int wz = (int)roundf(z1 + dz * t);
+
+            // Window at height 2-3
+            setBlock(wx, hy + 2, wz, BlockType::GLASS);
+            setBlock(wx, hy + 3, wz, BlockType::GLASS);
+        }
+    }
+
+    // Flat roof over house
+    for (int x = ihMinX - 1; x <= ihMaxX + 1; x++) {
+        for (int z = ihMinZ - 1; z <= ihMaxZ + 1; z++) {
+            if (pointInHouse((float)x, (float)z)) {
+                setBlock(x, hy + wallH, z, roofBlock);
+                setBlock(x, hy + wallH + 1, z, roofBlock);
+            }
+        }
+    }
 
     // ============================================================
-    // TREES - border the wider property perimeter
+    // TREES along lot boundary
     // ============================================================
-    struct TreePos { int x, z, h; };
-    TreePos trees[] = {
-        // North border
-        {-70, -44, 7}, {-60, -44, 8}, {-50, -44, 7}, {-40, -44, 6},
-        {-30, -44, 8}, {-20, -44, 7}, {-10, -44, 6}, {0, -44, 7},
-        {10, -44, 8}, {20, -44, 7}, {30, -44, 6}, {40, -44, 8},
-        {50, -44, 7}, {60, -44, 6}, {70, -44, 7},
-        // South border
-        {-70, 44, 8}, {-60, 44, 7}, {-50, 44, 6}, {-40, 44, 8},
-        {-30, 44, 7}, {-20, 44, 6}, {-10, 44, 7}, {0, 44, 8},
-        {10, 44, 7}, {20, 44, 6}, {30, 44, 8}, {40, 44, 7},
-        {50, 44, 6}, {60, 44, 8}, {70, 44, 7},
-        // West border
-        {-78, -35, 7}, {-78, -20, 8}, {-78, -5, 7}, {-78, 10, 6},
-        {-78, 25, 7}, {-78, 35, 8},
-        // Between pond and pool (open green with scattered trees)
-        {-45, -30, 7}, {-38, 28, 8}, {-48, 15, 6}, {-35, -18, 7},
-        {-42, 5, 8}, {-30, -28, 6}, {-25, 22, 7}, {-45, 20, 6},
-        {-35, -35, 7}, {-28, 32, 8},
-        // Around house
-        {8, -30, 7}, {8, 28, 8}, {25, 28, 7}, {32, 28, 6},
-        {32, -30, 8},
-        // Along driveway (east)
-        {45, -25, 7}, {55, -25, 8}, {65, -25, 7}, {80, -25, 6}, {95, -25, 8}, {110, -25, 7},
-        {45, 25, 6}, {55, 25, 7}, {65, 25, 8}, {80, 25, 7}, {95, 25, 6}, {110, 25, 8},
-    };
+    for (size_t i = 0; i < lotVerts.size(); i++) {
+        size_t j = (i + 1) % lotVerts.size();
+        float x1 = lotVerts[i].first, z1 = lotVerts[i].second;
+        float x2 = lotVerts[j].first, z2 = lotVerts[j].second;
 
-    for (auto& t : trees)
-        placeTree(t.x, G + 1, t.z, t.h);
+        float dx = x2 - x1, dz = z2 - z1;
+        float len = sqrtf(dx * dx + dz * dz);
+        if (len < 10.0f) continue;
 
-    // Mark all chunks as dirty so meshes rebuild
+        int numTrees = (int)(len / 15.0f);
+        for (int t = 1; t <= numTrees; t++) {
+            float frac = (float)t / (float)(numTrees + 1);
+            int tx = (int)roundf(x1 + dx * frac);
+            int tz = (int)roundf(z1 + dz * frac);
+            // Offset slightly inside lot
+            float nx = -dz / len * 3;
+            float nz = dx / len * 3;
+            tx += (int)nx;
+            tz += (int)nz;
+            int treeH = 6 + (t % 3);
+            placeTree(tx, G + 1, tz, treeH);
+        }
+    }
+
+    // Mark all chunks as dirty
     for (auto& [key, chunk] : chunks_)
         chunk->dirty = true;
 }
