@@ -22,6 +22,5 @@ add_executable(minecraft
 target_include_directories(minecraft PRIVATE include lib)
 target_link_libraries(minecraft glfw GLEW::GLEW OpenGL::GL)
 
-# Copy shaders and textures to build dir
+# Copy shaders to build dir
 file(COPY shaders DESTINATION ${CMAKE_BINARY_DIR})
-file(COPY textures DESTINATION ${CMAKE_BINARY_DIR})
