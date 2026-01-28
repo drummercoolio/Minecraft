@@ -593,18 +593,31 @@ void World::placeStructures() {
     // ============================================================
     int driveW = 7;
 
-    // Driveway starts east of the apron, goes straight east
+    // Driveway starts at east end of apron, shifted east to clear house
     int driveStartX = gx2 + 2;
-    int driveZ = (apronZ1 + apronZ2) / 2; // center of apron
+    int driveStartZ = (apronZ1 + apronZ2) / 2;
+    int diagLen = 15;
 
     // Connect apron to driveway start
     for (int x = gx2 + 1; x <= driveStartX; x++)
-        for (int z = driveZ - driveW / 2; z <= driveZ + driveW / 2; z++)
+        for (int z = driveStartZ - driveW / 2; z <= driveStartZ + driveW / 2; z++)
             setBlock(x, G, z, BlockType::BEDROCK);
 
-    // Straight east section
-    for (int x = driveStartX; x <= propX2; x++)
-        for (int z = driveZ - driveW / 2; z <= driveZ + driveW / 2; z++)
+    // Diagonal section: goes northeast (+X, -Z) like a forward slash /
+    for (int i = 0; i < diagLen; i++) {
+        int cx = driveStartX + i;
+        int cz = driveStartZ - i;
+        for (int w = 0; w < driveW; w++) {
+            setBlock(cx + w, G, cz, BlockType::BEDROCK);
+            setBlock(cx + w, G, cz - 1, BlockType::BEDROCK);
+        }
+    }
+
+    // Straight east section from top of the forward slash
+    int straightStartX = driveStartX + diagLen;
+    int straightZ = driveStartZ - diagLen;
+    for (int x = straightStartX; x <= propX2; x++)
+        for (int z = straightZ - driveW / 2; z <= straightZ + driveW / 2; z++)
             setBlock(x, G, z, BlockType::BEDROCK);
 
     // ============================================================
