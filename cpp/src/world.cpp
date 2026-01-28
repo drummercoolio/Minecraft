@@ -318,8 +318,8 @@ void World::placeStructures() {
     moveDir(320, 218, lx, lz); lotVerts.push_back({lx, lz});
     // 80° NW for 350 ft
     moveDir(80, 350, lx, lz); lotVerts.push_back({lx, lz});
-    // 180° east for 935 ft back to start (force closure)
-    lotVerts.push_back({0, 0});
+    // Corrected closing segment: 185.7° for 835.9 ft (calculated to close polygon)
+    moveDir(185.7f, 835.9f, lx, lz); lotVerts.push_back({lx, lz});
 
     // Find lot bounding box
     float lotMinX = 1e9, lotMaxX = -1e9, lotMinZ = 1e9, lotMaxZ = -1e9;
@@ -370,8 +370,8 @@ void World::placeStructures() {
     moveDir(180, 3.5, hx, hz); houseVerts.push_back({hx, hz});  // east 3.5 ft
     moveDir(270, 15, hx, hz); houseVerts.push_back({hx, hz});   // south 15 ft
     moveDir(180, 23, hx, hz); houseVerts.push_back({hx, hz});   // east 23 ft
-    // south 32 ft back to origin (force closure)
-    houseVerts.push_back({0, 0});
+    // Corrected closing segment: 275.3° for 31.8 ft (calculated to close polygon)
+    moveDir(275.3f, 31.8f, hx, hz); houseVerts.push_back({hx, hz});
 
     // Offset house vertices to final position
     for (auto& v : houseVerts) {
